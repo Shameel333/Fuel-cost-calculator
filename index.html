@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#7F6354">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Fuel Cost">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+  :root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  body { margin: 0; }
+  [hidden] { display: none !important; }
+</style>
+<title>Trip Fuel Cost</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap">
+<style>
+  /* Layout: one phone-width column. A brown result band on top holds the price; white form below.
+     The add-vehicle dialog floats over the page on a dimmed backdrop. */
+  :root {
+    --brown: #7F6354;
+    --white: #ffffff;
+    --ink: #4a372d;      /* deep shade of the brown for typed text */
+    --hint: #6b5245;     /* small helper text */
+    --edge: #9d8a7f;     /* control borders, placeholders */
+    --line: #e3d8d2;     /* hairlines */
+    --tint: #f6f1ee;     /* soft surface */
+    --error: #c0392b;
+    --display: 'Bricolage Grotesque', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --body: 'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--white);
+    color: var(--brown);
+    font: 400 16px/1.45 var(--body);
+  }
+  /* brown extends under the phone status bar */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0 0 auto;
+    height: env(safe-area-inset-top, 0px);
+    background: var(--brown);
+    z-index: 10;
+  }
+
+  .wrap {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+
+  /* ---------- Result band ---------- */
+  .hero { background: var(--brown); color: var(--white); padding-bottom: 16px; }
+  .hero .wrap { padding-block: 26px 0; }
+  .eyebrow {
+    margin: 0 0 6px;
+    font: 700 12px/1 var(--body);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+  }
+  .price {
+    display: block;
+    font: 800 clamp(3.4rem, 17vw, 5rem)/1 var(--display);
+    letter-spacing: -.02em;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+  .summary { margin: 12px 0 0; font-size: 14px; font-weight: 600; }
+  .lane {
+    height: 4px;
+    margin-top: 22px;
+    background: repeating-linear-gradient(90deg, rgba(255,255,255,.55) 0 18px, transparent 18px 34px);
+  }
+
+  /* ---------- Form ---------- */
+  main .wrap { padding-block: 24px 40px; }
+  .stack { display: grid; gap: 20px; }
+  .field { display: grid; gap: 8px; min-width: 0; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; }
+
+  label, .lbl {
+    font: 700 12px/1 var(--body);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--brown);
+  }
+
+  .control {
+    box-sizing: border-box;
+    width: 100%;
+    height: 52px;
+    padding: 0 14px;
+    border: 1.5px solid var(--edge);
+    border-radius: 12px;
+    background: var(--white);
+    color: var(--ink);
+    font: 500 16px/1.2 var(--body);
+  }
+  .control::placeholder { color: var(--edge); opacity: 1; }
+  .control:focus-visible { outline: 3px solid var(--brown); outline-offset: 1px; border-color: var(--brown); }
+  .control.invalid { border-color: var(--error); box-shadow: 0 0 0 3px rgba(192, 57, 43, .14); }
+  .control.invalid:focus-visible { outline-color: var(--error); border-color: var(--error); }
+  input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+  select.control {
+    -webkit-appearance: none;
+    appearance: none;
+    padding-right: 42px;
+    text-overflow: ellipsis;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237F6354' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    background-size: 18px;
+  }
+  select.control.is-empty { color: var(--edge); }
+  select.control option { color: var(--ink); }
+
+  .unitwrap { position: relative; }
+  .unitwrap .control { padding-right: 56px; }
+  .unit {
+    position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+    font: 700 13px/1 var(--body); color: var(--brown); pointer-events: none;
+  }
+  .iconwrap { position: relative; }
+  .iconwrap .control { padding-left: 44px; }
+  .lead {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    color: var(--brown); pointer-events: none;
+  }
+
+  .row { display: flex; align-items: center; gap: 10px; }
+  .row select { flex: 1; min-width: 0; }
+
+  .plus {
+    flex: none;
+    width: 44px; height: 44px;
+    display: grid; place-items: center;
+    padding: 0;
+    border: 1.5px solid var(--brown);
+    border-radius: 50%;
+    background: var(--white);
+    color: var(--brown);
+    cursor: pointer;
+    transition: background .15s, color .15s;
+  }
+  .plus:hover { background: var(--brown); color: var(--white); }
+  .plus:focus-visible, .btn:focus-visible, .x:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+
+  .btn {
+    box-sizing: border-box;
+    width: 100%;
+    height: 54px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--brown);
+    color: var(--white);
+    font: 700 16px/1 var(--body);
+    letter-spacing: .02em;
+    cursor: pointer;
+    transition: background .15s, transform .1s;
+  }
+  .btn:hover { background: #6d5447; }
+  .btn:active { transform: translateY(1px); }
+  .btn.sm { height: 48px; }
+  .btn.ghost { background: var(--white); color: var(--brown); box-shadow: inset 0 0 0 1.5px var(--brown); }
+  .btn.ghost:hover { background: var(--tint); }
+
+  .note { margin: 0; font-size: 13px; color: var(--hint); }
+
+  /* ---------- Add-vehicle dialog ---------- */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    box-sizing: border-box;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    overflow-y: auto;
+    padding-top: calc(max(16px, env(safe-area-inset-top, 0px)) + 7vh);
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    background: rgba(74, 55, 45, .52);
+    animation: fade .18s ease-out;
+  }
+  .dialog {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 440px;
+    display: grid;
+    gap: 18px;
+    padding: 20px;
+    border-radius: 22px;
+    background: var(--white);
+    box-shadow: 0 28px 60px -14px rgba(74, 55, 45, .5);
+    animation: rise .22s ease-out;
+  }
+  .dhead { display: flex; align-items: center; gap: 12px; }
+  .dicon {
+    flex: none; width: 44px; height: 44px;
+    display: grid; place-items: center;
+    border-radius: 14px; background: var(--brown); color: var(--white);
+  }
+  .dtext { flex: 1; min-width: 0; }
+  .dtext h2 { margin: 0; font: 700 20px/1.15 var(--display); color: var(--ink); }
+  .dtext p { margin: 3px 0 0; font-size: 13px; color: var(--hint); }
+  .x {
+    flex: none; width: 40px; height: 40px;
+    display: grid; place-items: center;
+    padding: 0; border: 0; border-radius: 50%;
+    background: transparent; color: var(--brown); cursor: pointer;
+  }
+  .x:hover { background: var(--tint); }
+  .actions { display: grid; grid-template-columns: 1fr 1.5fr; gap: 10px; }
+
+  .saved { display: grid; gap: 10px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .saved-head { display: flex; align-items: center; justify-content: space-between; }
+  .count {
+    min-width: 22px; padding: 3px 8px; box-sizing: border-box; text-align: center;
+    border-radius: 999px; background: var(--tint);
+    font: 700 12px/1 var(--body); color: var(--brown);
+  }
+  .vlist {
+    list-style: none; margin: 0; padding: 0;
+    display: grid; gap: 8px;
+    max-height: 184px; overflow-y: auto;
+  }
+  .vlist li {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 4px 4px 14px;
+    border-radius: 12px; background: var(--tint);
+  }
+  .vname { flex: 1; min-width: 0; overflow-wrap: anywhere; font-weight: 600; color: var(--ink); }
+  .vmile {
+    white-space: nowrap; padding: 4px 10px; border-radius: 999px;
+    background: var(--white); font: 700 12px/1 var(--body); color: var(--brown);
+    font-variant-numeric: tabular-nums;
+  }
+
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .plus, .btn { transition: none; }
+    .overlay, .dialog { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Trip fuel cost</p>
+    <output id="price" class="price" aria-live="off">₹ —</output>
+    <p id="summary" class="summary" role="status">Pick a vehicle and enter the distance.</p>
+  </div>
+  <div class="lane" aria-hidden="true"></div>
+</header>
+
+<main>
+  <div class="wrap">
+    <div class="stack">
+      <div class="field">
+        <label for="vehicle">Vehicle</label>
+        <div class="row">
+          <select id="vehicle" class="control is-empty"></select>
+          <button type="button" id="addToggle" class="plus" aria-label="Add vehicle" aria-haspopup="dialog">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="field">
+          <label for="km">Distance</label>
+          <div class="unitwrap">
+            <input id="km" class="control" type="number" inputmode="decimal" min="0" step="any" placeholder="e.g. 120">
+            <span class="unit">km</span>
+          </div>
+        </div>
+        <div class="field">
+          <label for="fuelPrice">Fuel price</label>
+          <div class="unitwrap">
+            <input id="fuelPrice" class="control" type="number" inputmode="decimal" min="0" step="any" placeholder="e.g. 100">
+            <span class="unit">₹/L</span>
+          </div>
+        </div>
+      </div>
+
+      <button type="button" id="calc" class="btn">Calculate cost</button>
+      <p class="note">Vehicles and fuel price are saved on this device. Set the fuel price to match your pump.</p>
+    </div>
+  </div>
+</main>
+
+<div id="addOverlay" class="overlay" hidden>
+  <div id="dialog" class="dialog" role="dialog" aria-modal="true" aria-labelledby="dTitle">
+    <div class="dhead">
+      <div class="dicon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>
+      </div>
+      <div class="dtext">
+        <h2 id="dTitle">Add vehicle</h2>
+        <p>Saved on this device for next time.</p>
+      </div>
+      <button type="button" id="closeDialog" class="x" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+
+    <div class="stack" style="gap:14px">
+      <div class="field">
+        <label for="vName">Vehicle name</label>
+        <div class="iconwrap">
+          <svg class="lead" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>
+          <input id="vName" class="control" type="text" maxlength="40" placeholder="e.g. Honda City" autocomplete="off">
+        </div>
+      </div>
+      <div class="field">
+        <label for="vMileage">Average mileage</label>
+        <div class="iconwrap unitwrap">
+          <svg class="lead" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>
+          <input id="vMileage" class="control" type="number" inputmode="decimal" min="0" step="any" placeholder="e.g. 16">
+          <span class="unit">km/l</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button type="button" id="cancelDialog" class="btn sm ghost">Cancel</button>
+      <button type="button" id="saveVehicle" class="btn sm">Save vehicle</button>
+    </div>
+
+    <div id="savedWrap" class="saved" hidden>
+      <div class="saved-head">
+        <span class="lbl">Saved vehicles</span>
+        <span id="count" class="count">0</span>
+      </div>
+      <ul id="vehicleList" class="vlist"></ul>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var KEY = 'tripFuelCost.v1';
+  var state = { vehicles: [], price: 100, selected: '' };
+
+  function $(id) { return document.getElementById(id); }
+  var sel = $('vehicle'), kmEl = $('km'), priceEl = $('fuelPrice'), calcBtn = $('calc'),
+      toggle = $('addToggle'), overlay = $('addOverlay'), dialog = $('dialog'),
+      closeBtn = $('closeDialog'), cancelBtn = $('cancelDialog'),
+      nameEl = $('vName'), mileEl = $('vMileage'), saveBtn = $('saveVehicle'),
+      list = $('vehicleList'), savedWrap = $('savedWrap'), countEl = $('count'),
+      out = $('price'), summary = $('summary');
+
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+  var nf = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 });
+  function fmt(n) { return nf.format(n); }
+  var rupee = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (!raw) return;
+      var d = JSON.parse(raw);
+      if (Array.isArray(d.vehicles)) {
+        state.vehicles = d.vehicles
+          .filter(function (v) {
+            return v && typeof v.name === 'string' && Number(v.mileage) > 0 && String(v.id).indexOf('sample-') !== 0;
+          })
+          .map(function (v) { return { id: String(v.id), name: v.name, mileage: Number(v.mileage) }; });
+      }
+      if (Number(d.price) > 0) state.price = Number(d.price);
+      if (typeof d.selected === 'string') state.selected = d.selected;
+    } catch (e) { /* storage unavailable: run from memory */ }
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  function renderSelect() {
+    sel.textContent = '';
+    var ph = new Option(state.vehicles.length ? 'Choose vehicle' : 'Add a vehicle with +', '');
+    ph.disabled = true;
+    sel.appendChild(ph);
+    state.vehicles.forEach(function (v) {
+      sel.appendChild(new Option(v.name + ' · ' + fmt(v.mileage) + ' km/l', v.id));
+    });
+    var has = state.vehicles.some(function (v) { return v.id === state.selected; });
+    if (has) { sel.value = state.selected; } else { state.selected = ''; ph.selected = true; }
+    sel.classList.toggle('is-empty', !sel.value);
+  }
+
+  function renderList() {
+    list.textContent = '';
+    savedWrap.hidden = state.vehicles.length === 0;
+    countEl.textContent = String(state.vehicles.length);
+    state.vehicles.forEach(function (v) {
+      var li = document.createElement('li');
+      var n = document.createElement('span'); n.className = 'vname'; n.textContent = v.name;
+      var m = document.createElement('span'); m.className = 'vmile'; m.textContent = fmt(v.mileage) + ' km/l';
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'x'; b.dataset.id = v.id;
+      b.setAttribute('aria-label', 'Remove ' + v.name);
+      b.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
+      li.appendChild(n); li.appendChild(m); li.appendChild(b);
+      list.appendChild(li);
+    });
+  }
+
+  function mark(el, bad) { el.classList.toggle('invalid', !!bad); }
+
+  /* ---------- Dialog ---------- */
+  function openDialog() {
+    overlay.hidden = false;
+    document.body.style.overflow = 'hidden';
+    nameEl.focus();
+  }
+  function closeDialog() {
+    overlay.hidden = true;
+    document.body.style.overflow = '';
+    mark(nameEl, false); mark(mileEl, false);
+    toggle.focus();
+  }
+
+  /* ---------- Price ---------- */
+  var raf = 0;
+  function showPrice(target) {
+    cancelAnimationFrame(raf);
+    var end = Math.round(target);
+    if (reduced.matches) { out.textContent = rupee.format(end); return; }
+    var t0 = performance.now(), dur = 450;
+    function step(t) {
+      var p = Math.min(1, (t - t0) / dur);
+      var e = 1 - Math.pow(1 - p, 3);
+      out.textContent = rupee.format(p < 1 ? Math.round(end * e) : end);
+      if (p < 1) raf = requestAnimationFrame(step);
+    }
+    raf = requestAnimationFrame(step);
+  }
+
+  function calculate() {
+    var v = state.vehicles.filter(function (x) { return x.id === sel.value; })[0];
+    var km = parseFloat(kmEl.value);
+    var price = parseFloat(priceEl.value);
+    mark(sel, !v);
+    mark(kmEl, !(km > 0));
+    mark(priceEl, !(price > 0));
+    if (!v || !(km > 0) || !(price > 0)) return;
+
+    showPrice((km / v.mileage) * price);
+    summary.textContent = v.name + ' · ' + fmt(km) + ' km';
+    window.scrollTo({ top: 0, behavior: reduced.matches ? 'auto' : 'smooth' });
+  }
+
+  function addVehicle() {
+    var name = nameEl.value.trim();
+    var m = parseFloat(mileEl.value);
+    var badName = !name;
+    var badMile = !(m > 0 && m <= 200);
+    mark(nameEl, badName);
+    mark(mileEl, badMile);
+    if (badName) { nameEl.focus(); return; }
+    if (badMile) { mileEl.focus(); return; }
+
+    var id = 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    state.vehicles.push({ id: id, name: name, mileage: m });
+    state.selected = id;
+    save();
+    renderSelect();
+    renderList();
+    mark(sel, false);
+    nameEl.value = '';
+    mileEl.value = '';
+    closeDialog();
+  }
+
+  /* ---------- Events ---------- */
+  sel.addEventListener('change', function () {
+    state.selected = sel.value;
+    sel.classList.toggle('is-empty', !sel.value);
+    mark(sel, false);
+    save();
+  });
+  priceEl.addEventListener('input', function () {
+    mark(priceEl, false);
+    var p = parseFloat(priceEl.value);
+    if (p > 0) { state.price = p; save(); }
+  });
+  kmEl.addEventListener('input', function () { mark(kmEl, false); });
+  nameEl.addEventListener('input', function () { mark(nameEl, false); });
+  mileEl.addEventListener('input', function () { mark(mileEl, false); });
+
+  toggle.addEventListener('click', openDialog);
+  closeBtn.addEventListener('click', closeDialog);
+  cancelBtn.addEventListener('click', closeDialog);
+  saveBtn.addEventListener('click', addVehicle);
+  calcBtn.addEventListener('click', calculate);
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) closeDialog(); });
+
+  overlay.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { closeDialog(); return; }
+    if (e.key !== 'Tab') return;
+    var f = [].slice.call(dialog.querySelectorAll('button, input')).filter(function (x) {
+      return !x.disabled && x.offsetParent !== null;
+    });
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+
+  list.addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-id]');
+    if (!b) return;
+    state.vehicles = state.vehicles.filter(function (v) { return v.id !== b.dataset.id; });
+    if (state.selected === b.dataset.id) state.selected = '';
+    save();
+    renderSelect();
+    renderList();
+  });
+
+  [kmEl, priceEl].forEach(function (el) {
+    el.addEventListener('keydown', function (e) { if (e.key === 'Enter') calculate(); });
+  });
+  [nameEl, mileEl].forEach(function (el) {
+    el.addEventListener('keydown', function (e) { if (e.key === 'Enter') addVehicle(); });
+  });
+
+  load();
+  priceEl.value = state.price;
+  renderSelect();
+  renderList();
+})();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  });
+}
+</script>
+</body>
+</html>
